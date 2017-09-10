@@ -1,0 +1,313 @@
+<!DOCTYPE html>
+<html>
+  <head>
+    <title>
+      TENNIS
+    </title>
+
+    <script>
+      is_auto = false;
+      is_speed_up = true;
+      mouse_y = 0;
+
+      window.onload = function() {
+        $('#radioBtn1 a').on('click', function(){
+            var sel = $(this).data('title');
+            var tog = $(this).data('toggle');
+            
+            $('a[data-toggle="'+tog+'"]').not('[data-title="'+sel+'"]').removeClass('active').addClass('notActive');
+            $('a[data-toggle="'+tog+'"][data-title="'+sel+'"]').removeClass('notActive').addClass('active');
+        })
+
+        $('#radioBtn2 a').on('click', function(){
+            var sel = $(this).data('title');
+            var tog = $(this).data('toggle');
+            
+            $('a[data-toggle="'+tog+'"]').not('[data-title="'+sel+'"]').removeClass('active').addClass('notActive');
+            $('a[data-toggle="'+tog+'"][data-title="'+sel+'"]').removeClass('notActive').addClass('active');
+        })
+        
+        $('#manu').on('click', function(){
+          is_auto = false;
+        })
+        
+        $('#auto').on('click', function(){
+          is_auto = true;
+        })
+        
+        $('#speed-up').on('click', function(){
+          is_speed_up = true;
+        })
+        
+        $('#speed-stop').on('click', function(){
+          is_speed_up = false;
+        })
+        
+        canvas = document.getElementById("canvas");
+        context = canvas.getContext("2d");
+    
+        w = 10;
+        player_width = 10;
+        player_you = new player(w / 2, canvas.height / 2, 0, 0, player_width, 80, 0.8);
+        player_ai = new player(canvas.width - w / 2, canvas.height / 2, 0, 0, player_width, 80, 0.8);
+        ball = new ball(5);
+        ball.reset()
+    
+        count = 0;
+        speed_up_amount = 0.1;
+    
+        setInterval(main, 1000/30);
+        canvas.addEventListener("mousemove", function(e) {
+          mouse_y = e.clientY;
+        })
+      }
+    
+      class physical_obj {
+        constructor(x, y, vx, vy) {
+          this.origin_x = x;
+          this.origin_y = y;
+          this.origin_vx = vx;
+          this.origin_vy = vy;
+
+          this.x = x;
+          this.y = y;
+          this.vx = vx;
+          this.vy = vy;
+        }
+
+        reset() {
+          this.x = this.origin_x;
+          this.y = this.origin_y;
+          this.vx = this.origin_vx;
+          this.vx = this.origin_vy;
+        }
+      }
+      
+      class player extends physical_obj {
+        constructor(x, y, vx, vy, width, height, speed) {
+          super(x, y, vx, vy);
+          this.width = width;
+          this.height = height;
+          this.speed = speed;
+          this.score = 0;
+        }
+    
+        update(vtx, ty) {
+          if (vtx > 0) {
+            ty = canvas.height / 2;
+          }
+          
+          this.vy = this.speed * (ty - this.y);
+          this.y += this.vy;
+        }
+    
+        draw() {
+          const x = this.x - this.width / 2;
+          const y = this.y - this.height / 2;
+          context.fillStyle = "black";
+          context.fillRect(x, y, this.width, this.height);
+        }
+
+        reset() {
+          super.reset();
+          this.score = 0;
+        }
+      }
+    
+      class ball extends physical_obj {
+        constructor (radius) {
+          super(0, 0, 0, 0);
+          this.radius = radius;
+        }
+    
+        update(l_y, l_height, r_y, r_height) {
+          let state = "safe";
+    
+          const x = this.vx + this.x;
+          const y = this.vy + this.y;
+    
+          const speed_up = (is_speed_up) ? speed_up_amount: 0;
+
+          if ((y < 0 && this.vy <= 0) ||
+              (y > canvas.height && this.vy >= 0)) {
+                this.vy = -this.vy + ((this.vy > 0) ? -speed_up: speed_up);
+          }
+    
+          if ((x < player_width && this.vx <= 0) &&
+              (y > l_y + l_height / 2 + 10 || y < l_y - l_height / 2 - 10)) {
+            state = "left";
+          }
+    
+          if ((x > canvas.width && this.vx >= 0) &&
+              (y > r_y + r_height / 2 + 10 || y < r_y - r_height / 2 - 10)) {
+            state = "right";
+          }
+          
+          if ((x > canvas.width && this.vx >= 0) ||
+              (x < 0 && this.vx <= 0)) {
+            this.vx = -this.vx + ((this.vx > 0) ? -speed_up: speed_up);
+          }
+    
+          this.x += this.vx;
+          this.y += this.vy;
+          
+          return state;
+        }
+    
+        draw() {
+          context.fillStyle = "black";
+          context.fillRect(this.x - this.radius / 2, this.y - this.radius / 2, this.radius, this.radius);
+    
+          context.beginPath();
+          context.moveTo(this.x, this.y);
+          context.lineTo(this.x - this.vx, this.y - this.vy);
+          context.stroke();
+        }
+    
+        reset() {
+          this.x = canvas.width / 2;
+          this.y = canvas.height / 2;
+          this.vx = ((Math.random() < 0.5) ? -1: 1) * 11 + Math.random() * 5;
+          this.vy = ((Math.random() < 0.5) ? -1: 1) * 11 + Math.random() * 5;
+        }
+      }
+    
+      function main() {
+        update();
+        draw();
+        ++count;
+      }
+    
+      function update() {
+        if (is_auto) {
+          player_you.update(ball.vx, ball.y);
+        } else {
+          player_you.update(-1, mouse_y);
+        }
+        player_ai.update(-ball.vx, ball.y);
+    
+        const l_y = player_you.y;
+        const l_height = player_you.height;
+        const r_y = player_ai.y;
+        const r_height = player_ai.height;
+        
+        switch(ball.update(l_y, l_height, r_y, r_height)) {
+          case "safe":
+            break;
+            
+          case "left":
+            player_you.score++;
+            break;
+            
+          case "right":
+            player_ai.score++;
+            break;
+    
+          default:
+            break;
+        }
+      }
+      
+      function draw() {
+        draw_background();
+        player_you.draw();
+        player_ai.draw();
+        ball.draw();
+        draw_ui();
+      }
+    
+      function draw_background() {
+        context.fillStyle = "black";
+        context.rect(0, 0, canvas.width, canvas.height);
+        context.stroke();
+        context.fillStyle = "white";
+        context.fillRect(1, 1, canvas.width - 2, canvas.height - 2);
+      }
+    
+      function draw_ui() {
+        context.fillStyle = "black";
+        context.font = "48px serif";
+        context.fillText(player_you.score, canvas.width / 2 - 130, 50);
+        context.fillText(player_ai.score, canvas.width / 2 + 100, 50);
+        context.fillText("Speed : " + Math.sqrt(ball.vx * ball.vx + ball.vy * ball.vy).toFixed(2), canvas.width / 2 - 130, canvas.height - 20);
+      }
+
+      function reset() {
+        ball.reset();
+        count = 0;
+
+        player_you.reset();
+        player_ai.reset();
+      }
+    </script>
+    
+    <link rel="stylesheet" href="https://maxcdn.bootstrapcdn.com/bootstrap/4.0.0-beta/css/bootstrap.min.css">
+
+    <style>
+      .btn {
+        cursor: pointer;
+      }
+      #radioBtn1 .notActive{
+          color: #3276b1;
+          background-color: #fff;
+      }
+      #radioBtn1 .active{
+          color: #fff;
+      }
+      #radioBtn2 .notActive{
+          color: #3276b1;
+          background-color: #fff;
+      }
+      #radioBtn2 .active{
+          color: #fff;
+      }
+      canvas {
+        padding-left: 0;
+        padding-right: 0;
+        margin-left: auto;
+        margin-right: auto;
+        display: block;
+      }
+    </style>
+  </head>
+
+  <body>
+    <canvas id="canvas" width="800" height="600">
+    </canvas>
+    
+    <div class="container">
+      <div class="row" style="margin: 1em">
+        <div class="col-md-12 form-group">
+          <input type="button" class="btn btn-primary" onclick="reset()" value="RESET">
+        </div>
+      </div>
+
+      <div class="row" style="margin: 1em">
+          <div class="col-md-12 form-group">
+            <div class="input-group">
+              <div id="radioBtn1" class="btn-group">
+                <a id="manu" class="btn btn-primary btn-sm active" data-toggle="user" data-title="Y">手動</a>
+                <a id="auto" class="btn btn-primary btn-sm notActive" data-toggle="user" data-title="N">自動</a>
+              </div>
+              <input type="hidden" name="user" id="user">
+            </div>
+          </div>
+      </div>
+
+      <div class="row" style="margin: 1em">
+          <div class="col-md-12 form-group">
+            <div class="input-group">
+              <div id="radioBtn2" class="btn-group">
+                <a id="speed-up" class="btn btn-primary btn-sm active" data-toggle="speed" data-title="Y">スピードアップ</a>
+                <a id="speed-stop" class="btn btn-primary btn-sm notActive" data-toggle="speed" data-title="N">スピード固定</a>
+              </div>
+              <input type="hidden" name="speed" id="speed">
+            </div>
+          </div>
+      </div>
+    
+    </div>
+    
+    <script src="https://code.jquery.com/jquery-3.1.1.slim.min.js" integrity="sha384-A7FZj7v+d/sdmMqp/nOQwliLvUsJfDHW+k9Omg/a/EheAdgtzNs3hpfag6Ed950n" crossorigin="anonymous"></script>
+    <script src="https://maxcdn.bootstrapcdn.com/bootstrap/4.0.0-beta/js/bootstrap.min.js" integrity="sha384-DztdAPBWPRXSA/3eYEEUWrWCy7G5KFbe8fFjk5JAIxUYHKkDx6Qin1DkWx51bBrb" crossorigin="anonymous"></script>
+  </body>
